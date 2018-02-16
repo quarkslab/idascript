@@ -62,18 +62,24 @@ class IDA:
     def start(self):
         params = " "+" ".join(self.params) if self.params else ""
         cmd_line = [IDA_BINARY, '-A', '-S"%s%s"' % (self.script_file, params), self.bin_file]
-        self._process = subprocess.Popen(cmd_line)
+        self._process = subprocess.Popen(cmd_line, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    @property
+    def returncode(self):
+        if self._process:
+            return self._process.returncode
+        else:
+            raise IDANotStared()
 
     @property
     def terminated(self) -> bool:
         if self._process:
             if self._process.poll() is not None:
-                self._process = None
                 return True
             else:
                 return False
         else:
-            return True
+            raise IDANotStared()
 
     @property
     def pid(self) -> int:
@@ -91,14 +97,12 @@ class IDA:
     def terminate(self) -> None:
         if self._process:
             self._process.terminate()
-            self._process = None
         else:
             raise IDANotStared()
 
     def kill(self) -> None:
         if self._process:
             self._process.kill()
-            self._process = None
         else:
             raise IDANotStared()
 
