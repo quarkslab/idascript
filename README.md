@@ -29,3 +29,8 @@ luanching it against binaries
 # Library usage
 
 TODO
+
+
+### TODO
+
+- comma separated files to send multiple binaries to idascripter
