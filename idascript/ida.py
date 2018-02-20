@@ -96,13 +96,13 @@ class MultiIDA:
         return res, bin_file.name
 
     @staticmethod
-    def map(generator, script, params=[]):
+    def map(generator, script, params=[], workers=None):
         if MultiIDA._running:
             raise MultiIDAAlreadyRunningException()
         MultiIDA._running = True
         MultiIDA._script_file = script
         MultiIDA._params = params
-        pool = Pool()
+        pool = Pool(workers)
         task = pool.map_async(MultiIDA._worker_handle, generator)
         while True:
             try:

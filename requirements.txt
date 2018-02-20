@@ -1,1 +1,5 @@
 python-magic
+
+#idascripter
+click
+progressbar2
