@@ -1,7 +1,5 @@
-import os
-import sys
-import logging
 import subprocess
+from idascript import IDA_BINARY
 from pathlib import Path
 from multiprocessing import Pool, Queue
 import queue
@@ -9,39 +7,6 @@ import queue
 
 from typing import TypeVar
 int_opt = TypeVar('IntOpt', int, None)
-
-
-
-IDAROOT_ENV = "IDAROOT"
-BIN_NAME = "idat64.exe" if sys.platform == "win32" else "idat64"
-
-IDA_BINARY = None
-
-
-def __check_environ() -> bool:
-    global IDA_BINARY
-    if IDAROOT_ENV in os.environ:
-        if (Path(os.environ[IDAROOT_ENV]) / BIN_NAME).exists():
-            IDA_BINARY = (Path(os.environ[IDAROOT_ENV]) / BIN_NAME).absolute()
-            return True
-    return False
-
-
-def __check_path() -> bool:
-    global IDA_BINARY
-    if "PATH" in os.environ:
-        for p in os.environ["PATH"].split(":"):
-            if (Path(p) / BIN_NAME).exists():
-                IDA_BINARY = (Path(os.environ[IDAROOT_ENV]) / BIN_NAME).absolute()
-                return True
-    return False
-
-
-if not __check_environ():
-    if not __check_path():
-        raise ImportError("IDA Pro executable not found, should be in $PATH or IDAROOT env variable")
-
-# TODO: Mettre tous ça dans le __init__.py de idascript
 
 
 class IDANotStared(Exception):
@@ -117,35 +82,35 @@ class MultiIDAAlreadyRunningException(Exception):
 
 class MultiIDA:
 
-    data_queue = Queue()
-    script_file = None
-    params = []
-    running = False
+    _data_queue = Queue()
+    _script_file = None
+    _params = []
+    _running = False
 
     @staticmethod
-    def worker_handle(bin_file):
-        ida = IDA(bin_file, MultiIDA.script_file, MultiIDA.params)
+    def _worker_handle(bin_file):
+        ida = IDA(bin_file, MultiIDA._script_file, MultiIDA._params)
         ida.start()
         res = ida.wait()
-        MultiIDA.data_queue.put((res, bin_file))
+        MultiIDA._data_queue.put((res, bin_file))
         return res, bin_file.name
 
     @staticmethod
     def map(generator, script, params=[]):
-        if MultiIDA.running:
+        if MultiIDA._running:
             raise MultiIDAAlreadyRunningException()
-        MultiIDA.running = True
-        MultiIDA.script_file = script
-        MultiIDA.params = params
+        MultiIDA._running = True
+        MultiIDA._script_file = script
+        MultiIDA._params = params
         pool = Pool()
-        task = pool.map_async(MultiIDA.worker_handle, generator)
+        task = pool.map_async(MultiIDA._worker_handle, generator)
         while True:
             try:
-                data = MultiIDA.data_queue.get(True, timeout=0.5)
+                data = MultiIDA._data_queue.get(True, timeout=0.5)
                 if data:
                     yield data
             except queue.Empty:
                 pass
             if task.ready():
                 break
-        MultiIDA.running = False
+        MultiIDA._running = False
