@@ -25,12 +25,13 @@ class IDA:
                 raise TypeError("script_params parameter should be a list")
         self.bin_file = Path(binary_file).absolute()
         self.script_file = Path(script_file).absolute()
-        self.params = script_params.replace('"', '\\"') if script_params else []
+        self.params = [x.replace('"', '\\"') for x in script_params] if script_params else []
         self._process = None
 
     def start(self):
         params = " "+" ".join(self.params) if self.params else ""
-        cmd_line = [IDA_BINARY, '-A', '-S"%s%s"' % (self.script_file, params), self.bin_file]
+        cmd_line = [IDA_BINARY, '-A', '-S%s%s' % (self.script_file, params), self.bin_file]
+        #print(cmd_line)
         self._process = subprocess.Popen(cmd_line, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     @property
