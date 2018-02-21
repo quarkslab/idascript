@@ -1,5 +1,6 @@
 from pathlib import Path
 import magic
+from typing import Generator, Union
 
 BINARY_FORMAT = {'application/x-dosexec',
                  'application/x-sharedlib',
@@ -7,7 +8,17 @@ BINARY_FORMAT = {'application/x-dosexec',
                  'application/x-executable'}
 
 
-def iter_binary_files(path):
+def iter_binary_files(path: Union[str, Path]) -> Generator[Path, None, None]:
+    """
+    Iterate a given directory looking for all the binary executable
+    files avec the magic mime type: x-doxexec, x-sharedlib, x-mach-binary
+    and x-executable.
+
+    :param path: Path where to start looking for binary files
+    :type path: Union[str, Path]
+    :return: Generator of binary file paths
+    :rtype: Generator[Path]
+    """
     p = Path(path)
     if p.is_file():
         if magic.from_file(str(p), mime=True) in BINARY_FORMAT:
