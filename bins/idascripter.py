@@ -85,9 +85,9 @@ def main(ida_path, worker, file, script, params):
         os.environ['IDA_PATH'] = str(Path(ida_path).absolute())
     p = Path(file)
     if p.is_file():
-        file_main(p, script, params)
+        file_main(p, script, list(params))
     elif p.is_dir():
-        path_main(p, script, params, worker)
+        path_main(p, script, list(params), worker)
     else:
         raise FileExistsError("Invalid file type")
 
