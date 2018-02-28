@@ -57,7 +57,7 @@ As a recall an idapython script should be architectured like this:
 import ida_auto
 import ida_pro
 
-ida_auto.autoWait() # wait for the pre-analysis of IDA to be terminated
+ida_auto.auto_wait() # wait for the pre-analysis of IDA to be terminated
 
 # Your script content
 
