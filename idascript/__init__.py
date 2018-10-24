@@ -12,7 +12,7 @@ def __check_environ() -> bool:
     global IDA_BINARY
     if IDA_PATH_ENV in os.environ:
         if (Path(os.environ[IDA_PATH_ENV]) / BIN_NAME).exists():
-            IDA_BINARY = (Path(os.environ[IDA_PATH_ENV]) / BIN_NAME).absolute()
+            IDA_BINARY = (Path(os.environ[IDA_PATH_ENV]) / BIN_NAME).resolve()
             return True
     return False
 
@@ -22,10 +22,9 @@ def __check_path() -> bool:
     if "PATH" in os.environ:
         for p in os.environ["PATH"].split(":"):
             if (Path(p) / BIN_NAME).exists():
-                IDA_BINARY = (Path(os.environ[IDA_PATH_ENV]) / BIN_NAME).absolute()
+                IDA_BINARY = (Path(p) / BIN_NAME).resolve()
                 return True
     return False
-
 
 if not __check_environ():
     if not __check_path():
