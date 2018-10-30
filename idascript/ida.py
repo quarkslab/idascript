@@ -37,8 +37,8 @@ class IDA:
         if script_params:
             if not isinstance(script_params, list):
                 raise TypeError("script_params parameter should be a list")
-        self.bin_file = Path(binary_file).absolute()
-        self.script_file = Path(script_file).absolute()
+        self.bin_file = Path(binary_file).resolve()
+        self.script_file = Path(script_file).resolve()
         self.params = [x.replace('"', '\\"') for x in script_params] if script_params else []
         self._process = None
 
@@ -47,9 +47,10 @@ class IDA:
         Start the IDA process on the binary.
         :return: None
         """
+
         params = " "+" ".join(self.params) if self.params else ""
-        cmd_line = [IDA_BINARY, '-A', '-S%s%s' % (self.script_file, params), self.bin_file]
-        #print(cmd_line)
+        cmd_line = [IDA_BINARY.as_posix(), '-A', '-S%s%s' % (self.script_file.as_posix(), params), self.bin_file.as_posix()]
+
         self._process = subprocess.Popen(cmd_line, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     @property
