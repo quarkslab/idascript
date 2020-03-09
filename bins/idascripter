@@ -6,10 +6,14 @@ import sys
 import os
 import progressbar
 import tempfile
+from typing import Optional, List
+
+from idascript import MultiIDA, iter_binary_files
 
 
 class FileMessage(progressbar.DynamicMessage):
     def __init__(self, name):
+        super().__init__(name)
         self.name = name
 
     def __call__(self, progress, data):
@@ -17,20 +21,25 @@ class FileMessage(progressbar.DynamicMessage):
         return 'File (%d/%d): %s' % val if val else 'File (-/-): /'
 
 
-class SuccessMessage(progressbar.DynamicMessage):
-    def __init__(self, name):
+class SuccessMessage(progressbar.Variable):
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
         self.name = name
 
     def __call__(self, progress, data):
         val = data['dynamic_messages'][self.name]
-        return 'OK:%d KO:%d' % val if val else 'OK:- KO:-'
+        if val:
+            return 'OK:%d KO:%d' % (val[0], val[1])
+        else:
+            return 'OK:- KO:-'
 
 
-def path_main(path, script, params, worker):
-    from idascript import MultiIDA, iter_binary_files
+def path_main(path: Path, script: Optional[str], params: List[str], worker: int = 1):
+
     generator = iter_binary_files(path)
     print("Counting files to analyse..")
     total = sum(1 for _ in iter_binary_files(path))
+
     bar = progressbar.ProgressBar(widgets=['[', FileMessage("binary"), ']',
                                            ' [', SuccessMessage("success"), '] ',
                                            '[', progressbar.Timer(), '] ',
@@ -60,9 +69,15 @@ def path_main(path, script, params, worker):
         print("Fail")
 
 
-def file_main(file, script, params):
+def file_main(file: Path, script: Optional[str], params: List[str]):
     from idascript import IDA
-    ida = IDA(file, script, params)
+    ida = IDA(file)
+
+    if script is None:
+        ida.set_direct(params)
+    else:
+        ida.set_idapython(script, params)
+
     ida.start()
     res = ida.wait()
     sys.exit(res)
@@ -72,18 +87,22 @@ def file_main(file, script, params):
 @click.option('-i', '--ida-path', type=click.Path(exists=True), default=None, help="IDA Pro installation directory")
 @click.option('-w', '--worker', type=click.IntRange(1, multiprocessing.cpu_count(), clamp=True), default=None,
               help="Number of parrallel workers (thread)")
+@click.option('-s', '--script', type=click.Path(exists=True), metavar="<ida script>", help="IDAPython script")
+@click.option('-a', '--auto', is_flag=True, help="Launch the plugin from IDA command line")
 @click.argument("file", type=click.Path(exists=True), metavar="<file|path>")
-@click.argument('script', type=click.Path(exists=True), metavar="<ida script>")
 @click.argument('params', nargs=-1)
-def main(ida_path, worker, file, script, params):
+def main(ida_path: str, worker: int, script: str, auto: bool, file: str, params):
     """
     <file/path>  Binary file to analyse (or directory)\r\n
-    <script>     Path to idapython script to execute\r\n
-    [PARAMS]     Params meant to be sent to idapython script
+    [PARAMS]     Params meant to be sent to the script
     """
     if ida_path:
         os.environ['IDA_PATH'] = str(Path(ida_path).absolute())
     p = Path(file)
+
+    if auto:
+        script = None
+
     if p.is_file():
         file_main(p, script, list(params))
     elif p.is_dir():
