@@ -64,7 +64,8 @@ class IDA:
     subprocess on IDA.
     """
 
-    def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]], script_params: List[str]=[]):
+    def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]],
+                 script_params: Optional[List[str]] = None):
         """
         Constructor for IDA object.
 
