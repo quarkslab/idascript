@@ -45,7 +45,7 @@ executing idapython scripts on one or multiple binary files in an easy manner.
 **Single file**
 
 ```bash
-idascripter my_binary_file [-s my_script.py] [my script params | IDA options]
+idascripter my_binary_file [-s my_script.py] [-t timeout] [my script params | IDA options]
 ```
 
 > idascripter returns the exit code of the IDA process, which can be itself the exit code of your
@@ -79,6 +79,7 @@ When running idascripter shows a progessbar and keeps track of files having a re
 
 ![MultiIDA](docs/multi_ida_screenshot.png)
 
+Note: An optional parameters (-l/--log) can be precised to have a log file with all the results.
 
 # Library usage
 

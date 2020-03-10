@@ -30,5 +30,5 @@ if not __check_environ():
     if not __check_path():
         raise ImportError("IDA Pro executable not found, should be in $PATH or IDA_PATH env variable")
 
-from idascript.ida import IDA, MultiIDA
+from idascript.ida import IDA, MultiIDA, TIMEOUT_RETURNCODE
 from idascript.utils import iter_binary_files

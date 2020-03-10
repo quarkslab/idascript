@@ -7,6 +7,7 @@ import queue
 from typing import List, Optional, Iterable, Union, Generator, Tuple
 
 IDA_TIMEOUT: float = 5.0
+TIMEOUT_RETURNCODE: int = -1
 
 
 class IDAException(Exception):
@@ -65,7 +66,7 @@ class IDA:
     """
 
     def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]],
-                 script_params: Optional[List[str]] = None):
+                 script_params: Optional[List[str]] = None, timeout: float = IDA_TIMEOUT):
         """
         Constructor for IDA object.
 
@@ -81,7 +82,9 @@ class IDA:
 
         self.script_file: Optional[Path] = None
         self.params: List[str] = []
-        
+
+        self.timeout = timeout if timeout != -1 else None
+
         if script_file:  # Mode IDAPython
             self._set_idapython(script_file, script_params)
         else:  # Direct mode
@@ -173,16 +176,18 @@ class IDA:
         else:
             raise IDANotStared()
 
-    def wait(self, timeout: int=None) -> int:
+    def wait(self) -> int:
         """
         Wait for the process to finish. This function hangs until
         the process terminate. A timeout can be given which raises
         TimeoutExpired if the timeout is exceeded (subprocess mechanism).
-        :param timeout: int value
         :return: return code
         """
         if self._process:
-            return self._process.wait(timeout)
+            try:
+                return self._process.wait(self.timeout)
+            except subprocess.TimeoutExpired:
+                return TIMEOUT_RETURNCODE
         else:
             raise IDANotStared()
 
@@ -217,23 +222,25 @@ class MultiIDA:
     _script_file: Optional[Path] = None
     _params: List[str] = []
     _running: bool = False
+    _timeout: float = IDA_TIMEOUT
 
     @staticmethod
     def _worker_handle(bin_file) -> Tuple[int, str]:
         """Worker function run concurrently"""
-        ida = IDA(bin_file, MultiIDA._script_file, MultiIDA._params)
+        ida = IDA(bin_file, MultiIDA._script_file, MultiIDA._params, MultiIDA._timeout)
 
         ida.start()
-        
         res = ida.wait()
-        
         MultiIDA._data_queue.put((res, bin_file))
         
         return res, bin_file.name
 
     @staticmethod
-    def map(generator: Iterable[Path], script: Union[str, Path] = None, params: List[str] = None, workers: int = None)\
-            -> Generator[Tuple[int, Path], None, None]:
+    def map(generator: Iterable[Path],
+            script: Union[str, Path] = None,
+            params: List[str] = None,
+            workers: int = None,
+            timeout: float = IDA_TIMEOUT) -> Generator[Tuple[int, Path], None, None]:
         """
         Iterator the generator sent and apply the script file on each
         files concurrently on a bunch of IDA workers. The function consume
@@ -243,6 +250,7 @@ class MultiIDA:
         :param script: path to the script to execute
         :param params: list of parameters to send to the script
         :param workers: number of workers to trigger in parallel
+        :param timeout: timeout for IDA runs (-1 means infinity)
         :return: generator of files processed (return code, file path)
         """
         if MultiIDA._running:
@@ -252,13 +260,15 @@ class MultiIDA:
 
         MultiIDA._script_file = script
 
-        MultiIDA._params = [] if params is None else params 
+        MultiIDA._params = [] if params is None else params
+
+        MultiIDA._timeout = timeout
 
         pool = Pool(workers)
         task = pool.map_async(MultiIDA._worker_handle, generator)
         while True:
             try:
-                data = MultiIDA._data_queue.get(True, timeout=IDA_TIMEOUT)
+                data = MultiIDA._data_queue.get(True)
                 if data:
                     yield data
             except queue.Empty:
