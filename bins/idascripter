@@ -71,12 +71,7 @@ def path_main(path: Path, script: Optional[str], params: List[str], worker: int 
 
 def file_main(file: Path, script: Optional[str], params: List[str]):
     from idascript import IDA
-    ida = IDA(file)
-
-    if script is None:
-        ida.set_direct(params)
-    else:
-        ida.set_idapython(script, params)
+    ida = IDA(file, script, params)
 
     ida.start()
     res = ida.wait()
@@ -88,10 +83,9 @@ def file_main(file: Path, script: Optional[str], params: List[str]):
 @click.option('-w', '--worker', type=click.IntRange(1, multiprocessing.cpu_count(), clamp=True), default=None,
               help="Number of parrallel workers (thread)")
 @click.option('-s', '--script', type=click.Path(exists=True), metavar="<ida script>", help="IDAPython script")
-@click.option('-a', '--auto', is_flag=True, help="Launch the plugin from IDA command line")
 @click.argument("file", type=click.Path(exists=True), metavar="<file|path>")
 @click.argument('params', nargs=-1)
-def main(ida_path: str, worker: int, script: str, auto: bool, file: str, params):
+def main(ida_path: str, worker: int, script: Optional[str], file: str, params):
     """
     <file/path>  Binary file to analyse (or directory)\r\n
     [PARAMS]     Params meant to be sent to the script
@@ -99,9 +93,6 @@ def main(ida_path: str, worker: int, script: str, auto: bool, file: str, params)
     if ida_path:
         os.environ['IDA_PATH'] = str(Path(ida_path).absolute())
     p = Path(file)
-
-    if auto:
-        script = None
 
     if p.is_file():
         file_main(p, script, list(params))

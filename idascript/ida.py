@@ -64,24 +64,29 @@ class IDA:
     subprocess on IDA.
     """
 
-    def __init__(self, binary_file: Union[Path, str]):
+    def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]], script_params: List[str]=[]):
         """
         Constructor for IDA object.
 
         :param binary_file: path of the binary file to analyse
+        :param script_file: path to the Python script to execute on the binary (if required)
+        :param script_params: additional parameters to send either to the script or IDA directly
         """
         if not Path(binary_file).exists():
             raise FileNotFoundError("Binary file: %s" % binary_file)
 
         self.bin_file: Path = Path(binary_file).resolve()
+        self._process = None
 
         self.script_file: Optional[Path] = None
         self.params: List[str] = []
+        
+        if script_file:  # Mode IDAPython
+            self._set_idapython(script_file, script_params)
+        else:  # Direct mode
+            self._set_direct(script_params)
 
-        self._process = None
-        self.mode: IDAMode = IDAMode.NOTSET
-
-    def set_idapython(self, script_file: Union[Path, str], script_params: List[str] = None) -> None:
+    def _set_idapython(self, script_file: Union[Path, str], script_params: List[str] = None) -> None:
         """
         Set IDAPython script parameter
 
@@ -103,7 +108,7 @@ class IDA:
         self.params = [x.replace('"', '\\"') for x in script_params] if script_params else []
         self.mode = IDAMode.IDAPYTHON
 
-    def set_direct(self, script_options: List[str]) -> None:
+    def _set_direct(self, script_options: List[str]) -> None:
         for option in script_options:
             if ':' not in option:
                 raise TypeError('Options must have a ":"')
@@ -210,22 +215,19 @@ class MultiIDA:
     _data_queue = Queue()
     _script_file: Optional[Path] = None
     _params: List[str] = []
-    _mode: IDAMode = IDAMode.NOTSET
     _running: bool = False
 
     @staticmethod
     def _worker_handle(bin_file) -> Tuple[int, str]:
         """Worker function run concurrently"""
-        ida = IDA(bin_file)
-
-        if MultiIDA._mode == IDAMode.IDAPYTHON:
-            ida.set_idapython(MultiIDA._script_file, MultiIDA._params)
-        elif MultiIDA._mode == IDAMode.DIRECT:
-            ida.set_direct(MultiIDA._params)
+        ida = IDA(bin_file, MultiIDA._script_file, MultiIDA._params)
 
         ida.start()
+        
         res = ida.wait()
+        
         MultiIDA._data_queue.put((res, bin_file))
+        
         return res, bin_file.name
 
     @staticmethod
@@ -247,16 +249,9 @@ class MultiIDA:
 
         MultiIDA._running = True
 
-        if script is not None:
-            MultiIDA._script_file = script
-            MultiIDA._mode = IDAMode.IDAPYTHON
-        else:
-            MultiIDA._mode = IDAMode.DIRECT
+        MultiIDA._script_file = script
 
-        if params is None:
-            params = []
-
-        MultiIDA._params = params
+        MultiIDA._params = [] if params is None else params 
 
         pool = Pool(workers)
         task = pool.map_async(MultiIDA._worker_handle, generator)
