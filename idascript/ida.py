@@ -6,7 +6,6 @@ from multiprocessing import Pool, Queue
 import queue
 from typing import List, Optional, Iterable, Union, Generator, Tuple
 
-IDA_TIMEOUT: float = 5.0
 TIMEOUT_RETURNCODE: int = -1
 
 
@@ -66,7 +65,7 @@ class IDA:
     """
 
     def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]],
-                 script_params: Optional[List[str]] = None, timeout: float = IDA_TIMEOUT):
+                 script_params: Optional[List[str]] = None, timeout: Optional[float] = None):
         """
         Constructor for IDA object.
 
@@ -83,7 +82,7 @@ class IDA:
         self.script_file: Optional[Path] = None
         self.params: List[str] = []
 
-        self.timeout = timeout if timeout != -1 else None
+        self.timeout = timeout
 
         if script_file:  # Mode IDAPython
             self._set_idapython(script_file, script_params)
@@ -187,6 +186,7 @@ class IDA:
             try:
                 return self._process.wait(self.timeout)
             except subprocess.TimeoutExpired:
+                self._process.terminate()
                 return TIMEOUT_RETURNCODE
         else:
             raise IDANotStared()
@@ -222,7 +222,7 @@ class MultiIDA:
     _script_file: Optional[Path] = None
     _params: List[str] = []
     _running: bool = False
-    _timeout: float = IDA_TIMEOUT
+    _timeout: float = None
 
     @staticmethod
     def _worker_handle(bin_file) -> Tuple[int, str]:
@@ -240,7 +240,7 @@ class MultiIDA:
             script: Union[str, Path] = None,
             params: List[str] = None,
             workers: int = None,
-            timeout: float = IDA_TIMEOUT) -> Generator[Tuple[int, Path], None, None]:
+            timeout: Optional[float] = None) -> Generator[Tuple[int, Path], None, None]:
         """
         Iterator the generator sent and apply the script file on each
         files concurrently on a bunch of IDA workers. The function consume
