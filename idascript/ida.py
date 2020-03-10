@@ -1,3 +1,4 @@
+import enum
 import subprocess
 from idascript import IDA_BINARY
 from pathlib import Path
@@ -5,14 +6,55 @@ from multiprocessing import Pool, Queue
 import queue
 from typing import List, Optional, Iterable, Union, Generator, Tuple
 
+IDA_TIMEOUT: float = 5.0
 
-class IDANotStared(Exception):
+
+class IDAException(Exception):
+    """
+    Base class for exceptions in the module.
+    """
+    pass
+
+
+class IDANotStared(IDAException):
     """
     This exception is raised when attempting
     to call a function of the `IDA` class before
     having called `start`.
     """
     pass
+
+
+class IDAModeNotSet(IDAException):
+    """
+    This exception is raised when the IDA Mode has not been set before calling `start`.
+    """
+    pass
+
+
+class MultiIDAAlreadyRunning(IDAException):
+    """
+    Exception raised if the `map` function of MultiIDA
+    is called while another map operation is still pending.
+    Design choices disallow launching two MultiIDA.map
+    function in the same time.
+    """
+    pass
+
+
+class IDAMode(enum.Enum):
+    """
+    Different modes possible for the IDA class
+    """
+
+    # Default value
+    NOTSET = enum.auto()
+
+    # Used when IDA will be launched for an IDAPython script
+    IDAPYTHON = enum.auto()
+
+    # Used when IDA will be launched directly
+    DIRECT = enum.auto()
 
 
 class IDA:
@@ -22,34 +64,75 @@ class IDA:
     subprocess on IDA.
     """
 
-    def __init__(self, binary_file: str, script_file: str, script_params: List[str]=[]):
+    def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]],
+                 script_params: Optional[List[str]] = None):
         """
         Constructor for IDA object.
 
         :param binary_file: path of the binary file to analyse
-        :param script_file: path to the script to execute on the binary file
-        :param script_params: additional parameters sent to the script (available via idc.ARGV in idapython)
+        :param script_file: path to the Python script to execute on the binary (if required)
+        :param script_params: additional parameters to send either to the script or IDA directly
         """
         if not Path(binary_file).exists():
             raise FileNotFoundError("Binary file: %s" % binary_file)
+
+        self.bin_file: Path = Path(binary_file).resolve()
+        self._process = None
+
+        self.script_file: Optional[Path] = None
+        self.params: List[str] = []
+        
+        if script_file:  # Mode IDAPython
+            self._set_idapython(script_file, script_params)
+        else:  # Direct mode
+            self._set_direct(script_params)
+
+    def _set_idapython(self, script_file: Union[Path, str], script_params: List[str] = None) -> None:
+        """
+        Set IDAPython script parameter
+
+        :param script_file: path to the script to execute on the binary file
+        :param script_params: additional parameters sent to the script (available via idc.ARGV in idapython)
+        :return:
+        """
         if not Path(script_file).exists():
             raise FileNotFoundError("Script file: %s" % script_file)
+
+        if script_params is None:
+            script_params = []
+
         if script_params:
             if not isinstance(script_params, list):
                 raise TypeError("script_params parameter should be a list")
-        self.bin_file = Path(binary_file).resolve()
+
         self.script_file = Path(script_file).resolve()
         self.params = [x.replace('"', '\\"') for x in script_params] if script_params else []
-        self._process = None
+        self.mode = IDAMode.IDAPYTHON
+
+    def _set_direct(self, script_options: List[str]) -> None:
+        for option in script_options:
+            if ':' not in option:
+                raise TypeError('Options must have a ":"')
+            self.params.append(f'-O{option}')
+
+        self.mode = IDAMode.DIRECT
 
     def start(self) -> None:
         """
         Start the IDA process on the binary.
         :return: None
         """
+        cmd_line = [IDA_BINARY.as_posix(), '-A']
 
-        params = " "+" ".join(self.params) if self.params else ""
-        cmd_line = [IDA_BINARY.as_posix(), '-A', '-S%s%s' % (self.script_file.as_posix(), params), self.bin_file.as_posix()]
+        if self.mode == IDAMode.IDAPYTHON:
+            params = " "+" ".join(self.params) if self.params else ""
+            cmd_line.append('-S%s%s' % (self.script_file.as_posix(), params))
+        elif self.mode == IDAMode.DIRECT:
+            cmd_line.extend(self.params)
+        else:
+            raise
+
+        cmd_line.append(self.bin_file.as_posix())
 
         self._process = subprocess.Popen(cmd_line, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -124,16 +207,6 @@ class IDA:
             raise IDANotStared()
 
 
-class MultiIDAAlreadyRunningException(Exception):
-    """
-    Exception raised if the `map` function of MultiIDA
-    is called while another map operation is still pending.
-    Design choices disallow launching two MultiIDA.map
-    function in the same time.
-    """
-    pass
-
-
 class MultiIDA:
     """
     Class to trigger multiple IDA processes concurrently
@@ -141,21 +214,25 @@ class MultiIDA:
     """
 
     _data_queue = Queue()
-    _script_file = None
-    _params = []
-    _running = False
+    _script_file: Optional[Path] = None
+    _params: List[str] = []
+    _running: bool = False
 
     @staticmethod
-    def _worker_handle(bin_file):
+    def _worker_handle(bin_file) -> Tuple[int, str]:
         """Worker function run concurrently"""
         ida = IDA(bin_file, MultiIDA._script_file, MultiIDA._params)
+
         ida.start()
+        
         res = ida.wait()
+        
         MultiIDA._data_queue.put((res, bin_file))
+        
         return res, bin_file.name
 
     @staticmethod
-    def map(generator: Iterable[Path], script: Union[str, Path], params: List[str]=[], workers: int=None)\
+    def map(generator: Iterable[Path], script: Union[str, Path] = None, params: List[str] = None, workers: int = None)\
             -> Generator[Tuple[int, Path], None, None]:
         """
         Iterator the generator sent and apply the script file on each
@@ -169,15 +246,19 @@ class MultiIDA:
         :return: generator of files processed (return code, file path)
         """
         if MultiIDA._running:
-            raise MultiIDAAlreadyRunningException()
+            raise MultiIDAAlreadyRunning()
+
         MultiIDA._running = True
+
         MultiIDA._script_file = script
-        MultiIDA._params = params
+
+        MultiIDA._params = [] if params is None else params 
+
         pool = Pool(workers)
         task = pool.map_async(MultiIDA._worker_handle, generator)
         while True:
             try:
-                data = MultiIDA._data_queue.get(True, timeout=0.5)
+                data = MultiIDA._data_queue.get(True, timeout=IDA_TIMEOUT)
                 if data:
                     yield data
             except queue.Empty:
