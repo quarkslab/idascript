@@ -45,7 +45,7 @@ executing idapython scripts on one or multiple binary files in an easy manner.
 **Single file**
 
 ```bash
-idascripter my_binary_file my_script [my script params]
+idascripter my_binary_file [-s my_script.py] [my script params | IDA options]
 ```
 
 > idascripter returns the exit code of the IDA process, which can be itself the exit code of your
