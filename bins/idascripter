@@ -92,7 +92,7 @@ def file_main(file: Path, script: Optional[str], params: List[str], timeout: flo
               help="Number of parrallel workers (thread)")
 @click.option('-s', '--script', type=click.Path(exists=True), metavar="<ida script>", help="IDAPython script")
 @click.option('-t', '--timeout', type=click.FloatRange(-1, clamp=False), help="Timeout (-1 means no timeout)",
-              default=5.0)
+              default=None)
 @click.option('-l', '--log-file', type=click.Path(file_okay=True), default=None, help="Log file tow write results")
 @click.argument("file", type=click.Path(exists=True), metavar="<file|path>")
 @click.argument('params', nargs=-1)
