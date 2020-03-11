@@ -265,7 +265,7 @@ class MultiIDA:
         MultiIDA._timeout = timeout
 
         pool = Pool(workers)
-        task = pool.map_async(MultiIDA._worker_handle, generator)
+        task = pool.map_async(MultiIDA._worker_handle, generator, chunksize=1)
         while True:
             try:
                 data = MultiIDA._data_queue.get(True)
