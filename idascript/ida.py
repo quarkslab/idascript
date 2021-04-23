@@ -4,6 +4,7 @@ from idascript import IDA_BINARY
 from pathlib import Path
 from multiprocessing import Pool, Queue
 import queue
+import os
 from typing import List, Optional, Iterable, Union, Generator, Tuple
 
 TIMEOUT_RETURNCODE: int = -1
@@ -64,7 +65,7 @@ class IDA:
     subprocess on IDA.
     """
 
-    def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]],
+    def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]] = None,
                  script_params: Optional[List[str]] = None, timeout: Optional[float] = None):
         """
         Constructor for IDA object.
@@ -84,7 +85,7 @@ class IDA:
 
         self.timeout = timeout
 
-        if script_file:  # Mode IDAPython
+        if script_file is not None:  # Mode IDAPython
             self._set_idapython(script_file, script_params)
         else:  # Direct mode
             self._set_direct(script_params)
@@ -136,7 +137,16 @@ class IDA:
 
         cmd_line.append(self.bin_file.as_posix())
 
-        self._process = subprocess.Popen(cmd_line, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self._process = subprocess.Popen(
+            cmd_line,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            # from https://www.hex-rays.com/blog/igor-tip-of-the-week-08-batch-mode-under-the-hood/
+            env={"TVHEADLESS": "1",
+                 "HOME": os.environ.get("HOME", ""),
+                 "TERM": "xterm",  # problem with libcurses
+            }
+        )
 
     @property
     def returncode(self) -> Optional[int]:
