@@ -1,5 +1,6 @@
 import enum
 import subprocess
+import logging
 from idascript import IDA_BINARY
 from pathlib import Path
 from multiprocessing import Pool, Queue
@@ -136,16 +137,18 @@ class IDA:
             raise
 
         cmd_line.append(self.bin_file.as_posix())
+        logging.debug(f"run: {' '.join(cmd_line)}")
+
+        env = os.environ
+        env["TVHEADLESS"] = "1"
+        env["TERM"] = "xterm"
 
         self._process = subprocess.Popen(
             cmd_line,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             # from https://www.hex-rays.com/blog/igor-tip-of-the-week-08-batch-mode-under-the-hood/
-            env={"TVHEADLESS": "1",
-                 "HOME": os.environ.get("HOME", ""),
-                 "TERM": "xterm",  # problem with libcurses
-            }
+            env=env
         )
 
     @property
