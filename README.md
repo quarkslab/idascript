@@ -6,7 +6,7 @@ Idascript is a python library allowing to launch idapython script on binary file
 
 Installing the library can be done with:
 
-    git clone gitlab@gitlab.qb:rdavid/idascript.git
+    git clone git@github.com:quarkslab/idascript.git
     cd idascript
     python3 setup.py install
 
