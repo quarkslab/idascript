@@ -22,6 +22,7 @@ def iter_binary_files(path: Union[str, Path]) -> Generator[Path, None, None]:
     :return: Generator of binary file paths
     :rtype: Generator[Path]
     """
+
     p = Path(path)
     if p.is_file():
         mime_type = magic.from_file(str(p), mime=True)

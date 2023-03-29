@@ -15,6 +15,7 @@ class IDAException(Exception):
     """
     Base class for exceptions in the module.
     """
+
     pass
 
 
@@ -24,6 +25,7 @@ class IDANotStared(IDAException):
     to call a function of the `IDA` class before
     having called `start`.
     """
+
     pass
 
 
@@ -31,6 +33,7 @@ class IDAModeNotSet(IDAException):
     """
     This exception is raised when the IDA Mode has not been set before calling `start`.
     """
+
     pass
 
 
@@ -41,6 +44,7 @@ class MultiIDAAlreadyRunning(IDAException):
     Design choices disallow launching two MultiIDA.map
     function in the same time.
     """
+
     pass
 
 
@@ -75,6 +79,7 @@ class IDA:
         :param script_file: path to the Python script to execute on the binary (if required)
         :param script_params: additional parameters to send either to the script or IDA directly
         """
+
         if not Path(binary_file).exists():
             raise FileNotFoundError("Binary file: %s" % binary_file)
 
@@ -97,8 +102,9 @@ class IDA:
 
         :param script_file: path to the script to execute on the binary file
         :param script_params: additional parameters sent to the script (available via idc.ARGV in idapython)
-        :return:
+        :return: None
         """
+
         if not Path(script_file).exists():
             raise FileNotFoundError("Script file: %s" % script_file)
 
@@ -114,6 +120,13 @@ class IDA:
         self.mode = IDAMode.IDAPYTHON
 
     def _set_direct(self, script_options: List[str]) -> None:
+        """
+        Set parameters script in direct mode
+
+        :param script_options: List of script options
+        :return: None
+        """
+
         for option in script_options:
             if ':' not in option:
                 raise TypeError('Options must have a ":"')
@@ -124,8 +137,10 @@ class IDA:
     def start(self) -> None:
         """
         Start the IDA process on the binary.
+
         :return: None
         """
+
         cmd_line = [IDA_BINARY.as_posix(), '-A']
 
         if self.mode == IDAMode.IDAPYTHON:
@@ -147,7 +162,7 @@ class IDA:
             cmd_line,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            # from https://www.hex-rays.com/blog/igor-tip-of-the-week-08-batch-mode-under-the-hood/
+            # See `https://www.hex-rays.com/blog/igor-tip-of-the-week-08-batch-mode-under-the-hood/`_
             env=env
         )
 
@@ -156,8 +171,10 @@ class IDA:
         """
         Get the returncode of the process. Raise IDANotStart
         if called before launching the process.
+
         :return: return code or None
         """
+
         if self._process:
             return self._process.returncode
         else:
@@ -167,8 +184,10 @@ class IDA:
     def terminated(self) -> bool:
         """
         Boolean function returning True if the process is terminated
-        :return: bool of Wether or not the process is terminated
+
+        :return: bool of whether the process is terminated
         """
+
         if self._process:
             if self._process.poll() is not None:
                 return True
@@ -181,8 +200,10 @@ class IDA:
     def pid(self) -> int:
         """
         Returns the PID of the IDA process
+
         :return: int (PID of the process)
         """
+
         if self._process:
             return self._process.pid
         else:
@@ -193,8 +214,10 @@ class IDA:
         Wait for the process to finish. This function hangs until
         the process terminate. A timeout can be given which raises
         TimeoutExpired if the timeout is exceeded (subprocess mechanism).
+
         :return: return code
         """
+
         if self._process:
             try:
                 return self._process.wait(self.timeout)
@@ -207,8 +230,10 @@ class IDA:
     def terminate(self) -> None:
         """
         Call terminate on the IDA process (kill -15)
+
         :return: None
         """
+
         if self._process:
             self._process.terminate()
         else:
@@ -217,8 +242,10 @@ class IDA:
     def kill(self) -> None:
         """
         Call kill on the IDA subprocess (kill -9)
+
         :return: None
         """
+
         if self._process:
             self._process.kill()
         else:
@@ -239,7 +266,13 @@ class MultiIDA:
 
     @staticmethod
     def _worker_handle(bin_file) -> Tuple[int, str]:
-        """Worker function run concurrently"""
+        """
+        Worker function run concurrently
+
+        :param bin_file: binary file to analyse
+        :return: return code, name of binary file
+        """
+
         ida = IDA(bin_file, MultiIDA._script_file, MultiIDA._params, MultiIDA._timeout)
 
         ida.start()
@@ -256,9 +289,10 @@ class MultiIDA:
             timeout: Optional[float] = None) -> Generator[Tuple[int, Path], None, None]:
         """
         Iterator the generator sent and apply the script file on each
-        files concurrently on a bunch of IDA workers. The function consume
+        file concurrently on a bunch of IDA workers. The function consume
         the generator as fast as it can occupy all the workers and yield a
         tuple (return code, path file) everytime an IDA process as terminated.
+
         :param generator: Iterable of file paths strings (or Path)
         :param script: path to the script to execute
         :param params: list of parameters to send to the script
@@ -266,6 +300,7 @@ class MultiIDA:
         :param timeout: timeout for IDA runs (-1 means infinity)
         :return: generator of files processed (return code, file path)
         """
+
         if MultiIDA._running:
             raise MultiIDAAlreadyRunning()
 
