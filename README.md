@@ -2,19 +2,11 @@
 
 Idascript is a python library allowing to launch idapython script on binary files in a transparent manner.
 
-## Dependencies
-
-idascript relies on libmagic for filetype detection. One shall install it beforehand.
-
-    sudo apt install libmagic1
-
 ## Installation
 
 Installing the library can be done with:
 
-    git clone git@github.com:quarkslab/idascript.git
-    cd idascript
-    python3 setup.py install
+    pip install idascript
 
 After installation `idascript` should be ready for import and the script `idascripter`
 should be in the path to use the library as a program.
@@ -36,6 +28,13 @@ or
 ```bash
 IDA_PATH=[your ida path] idascripter ...
 ```
+
+**Dependencies**: The ``idascripter`` script requires libmagic to identify
+executable binaries. It should be available on the system. It can be installed
+with:
+
+    sudo apt install libmagic1
+
 
 **Python library**
 
