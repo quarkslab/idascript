@@ -1,6 +1,7 @@
 import sys
 import os
 from pathlib import Path
+import logging
 
 IDA_PATH_ENV = "IDA_PATH"
 BIN_NAME = "idat64.exe" if sys.platform == "win32" else "idat64"
@@ -28,7 +29,7 @@ def __check_path() -> bool:
 
 if not __check_environ():
     if not __check_path():
-        raise ImportError("IDA Pro executable not found, should be in $PATH or IDA_PATH env variable")
+        logging.warning("IDA Pro executable not found, should be in $PATH or IDA_PATH env variable")
 
 from idascript.ida import IDA, MultiIDA, TIMEOUT_RETURNCODE
 from idascript.utils import iter_binary_files
