@@ -2,13 +2,13 @@
 
 Idascript is a python library allowing to launch idapython script on binary files in a transparent manner.
 
-# Dependencies
+## Dependencies
 
 idascript relies on libmagic for filetype detection. One shall install it beforehand.
 
     sudo apt install libmagic1
 
-# Installation
+## Installation
 
 Installing the library can be done with:
 
@@ -19,7 +19,7 @@ Installing the library can be done with:
 After installation `idascript` should be ready for import and the script `idascripter`
 should be in the path to use the library as a program.
 
-## IDA path
+### IDA path
 
 idascript looks for the `idat64`
 in the $PATH environment variable but if it is not present the IDA installation path
@@ -43,7 +43,7 @@ If `IDA_PATH` provided to the interpreter, it can be set manually with `os.envir
 
 > The easiest way is to export the environment variable in you bashrc
 
-# idascripter (program usage)
+## idascripter
 
 After installation the script `idascripter` is available in the path. It helps
 executing idapython scripts on one or multiple binary files in an easy manner.
@@ -87,7 +87,7 @@ When running idascripter shows a progessbar and keeps track of files having a re
 
 Note: An optional parameters (-l/--log) can be precised to have a log file with all the results.
 
-# Library usage
+## Library usage
 
 The python library intents to be as simple as possible. 
 
@@ -141,4 +141,15 @@ generator = my_custom_generator('/path/to/bins')
 for (retcode, file) in MultiIDA.map(generator, "/path/script", []):
     # Do something with files
 ```
+
+## API
+
+```{eval-rst}
+.. automodule:: idascript.ida
+    :members:
+    :show-inheritance:
+    :undoc-members:
+    :exclude-members: IDAMode
+```
+
 

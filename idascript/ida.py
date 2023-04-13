@@ -66,15 +66,16 @@ class IDAMode(enum.Enum):
 class IDA:
     """
     Class representing an IDA execution on a given file
-    with the given script. This class is a wrapper for
-    subprocess on IDA.
+    with a given script. This class is a wrapper to
+    subprocess IDA.
     """
 
-    def __init__(self, binary_file: Union[Path, str], script_file: Optional[Union[str, Path]] = None,
-                 script_params: Optional[List[str]] = None, timeout: Optional[float] = None):
+    def __init__(self,
+                 binary_file: Union[Path, str],
+                 script_file: Optional[Union[str, Path]] = None,
+                 script_params: Optional[List[str]] = None,
+                 timeout: Optional[float] = None):
         """
-        Constructor for IDA object.
-
         :param binary_file: path of the binary file to analyse
         :param script_file: path to the Python script to execute on the binary (if required)
         :param script_params: additional parameters to send either to the script or IDA directly
@@ -83,13 +84,13 @@ class IDA:
         if not Path(binary_file).exists():
             raise FileNotFoundError("Binary file: %s" % binary_file)
 
-        self.bin_file: Path = Path(binary_file).resolve()
+        self.bin_file: Path = Path(binary_file).resolve()  #: File to the binary
         self._process = None
 
-        self.script_file: Optional[Path] = None
-        self.params: List[str] = []
+        self.script_file: Optional[Path] = None  #: script file to execute
+        self.params: List[str] = []  #: list of paramaters given to IDA
 
-        self.timeout = timeout
+        self.timeout: Optional[float] = timeout  #: Timeout for IDA execution
 
         if script_file is not None:  # Mode IDAPython
             self._set_idapython(script_file, script_params)
@@ -98,11 +99,10 @@ class IDA:
 
     def _set_idapython(self, script_file: Union[Path, str], script_params: List[str] = None) -> None:
         """
-        Set IDAPython script parameter
+        Set IDAPython script parameter.
 
         :param script_file: path to the script to execute on the binary file
         :param script_params: additional parameters sent to the script (available via idc.ARGV in idapython)
-        :return: None
         """
 
         if not Path(script_file).exists():
@@ -137,8 +137,6 @@ class IDA:
     def start(self) -> None:
         """
         Start the IDA process on the binary.
-
-        :return: None
         """
 
         cmd_line = [IDA_BINARY.as_posix(), '-A']
@@ -171,8 +169,6 @@ class IDA:
         """
         Get the returncode of the process. Raise IDANotStart
         if called before launching the process.
-
-        :return: return code or None
         """
 
         if self._process:
@@ -184,8 +180,6 @@ class IDA:
     def terminated(self) -> bool:
         """
         Boolean function returning True if the process is terminated
-
-        :return: bool of whether the process is terminated
         """
 
         if self._process:
@@ -214,8 +208,6 @@ class IDA:
         Wait for the process to finish. This function hangs until
         the process terminate. A timeout can be given which raises
         TimeoutExpired if the timeout is exceeded (subprocess mechanism).
-
-        :return: return code
         """
 
         if self._process:
@@ -230,8 +222,6 @@ class IDA:
     def terminate(self) -> None:
         """
         Call terminate on the IDA process (kill -15)
-
-        :return: None
         """
 
         if self._process:
@@ -242,8 +232,6 @@ class IDA:
     def kill(self) -> None:
         """
         Call kill on the IDA subprocess (kill -9)
-
-        :return: None
         """
 
         if self._process:
