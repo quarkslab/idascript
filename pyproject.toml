@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "idascript"
+description = "IDA Pro wrapper to launch script on binaries"
+authors = [{ name = "Robin David", email = "rdavid@quarkslab.com" }]
+license = { text = "Apache Software License (Apache License, Version 2)" }
+readme = { file = "README.md", content-type = "text/markdown" }
+version = '0.1.0'
+requires-python = ">=3.8"
+dependencies = [
+    'python-magic',
+    'python-magic-bin; os_name=="nt"',
+    'click',
+    'progressbar2',
+]
+classifiers = [
+    'Topic :: Security',
+    'Environment :: Console',
+    'Operating System :: OS Independent',
+]
+
+[project.urls]
+Homepage = "https://github.com/quarkslab/idascript"
+Repository = "https://github.com/quarkslab/idascript"
+Documentation = "https://quarkslab.github.io/diffing-portal/idascript/README.html"
+"Bug Tracker" = "https://github.com/quarkslab/idascript/issues"
+
+[tools.setuptools]
+script-files = ["bins/idascripter"]
