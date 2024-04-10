@@ -3,7 +3,7 @@ import subprocess
 import logging
 from idascript import IDA_BINARY
 from pathlib import Path
-from multiprocessing import Pool, Queue
+from multiprocessing import Pool, Queue, Manager
 import queue
 import os
 from typing import List, Optional, Iterable, Union, Generator, Tuple
@@ -246,35 +246,28 @@ class MultiIDA:
     on a bunch of files.
     """
 
-    _data_queue = Queue()
-    _script_file: Optional[Path] = None
-    _params: List[str] = []
-    _running: bool = False
-    _timeout: float = None
-
     @staticmethod
-    def _worker_handle(bin_file) -> Tuple[int, str]:
-        """
-        Worker function run concurrently
+    def _worker(ingress, egress, script_file, params, timeout) -> None:
+        while True:
+            try:
+                file = ingress.get(timeout=0.5)
 
-        :param bin_file: binary file to analyse
-        :return: return code, name of binary file
-        """
+                ida = IDA(file, script_file, params, timeout)
+                ida.start()
+                res = ida.wait()
 
-        ida = IDA(bin_file, MultiIDA._script_file, MultiIDA._params, MultiIDA._timeout)
-
-        ida.start()
-        res = ida.wait()
-        MultiIDA._data_queue.put((res, bin_file))
-        
-        return res, bin_file.name
+                egress.put((file, res))
+            except queue.Empty:
+                pass
+            except KeyboardInterrupt:
+                break
 
     @staticmethod
     def map(generator: Iterable[Path],
             script: Union[str, Path] = None,
             params: List[str] = None,
             workers: int = None,
-            timeout: Optional[float] = None) -> Generator[Tuple[int, Path], None, None]:
+            timeout: Optional[float] = None) -> Generator[tuple[int, Path], None, None]:
         """
         Iterator the generator sent and apply the script file on each
         file concurrently on a bunch of IDA workers. The function consume
@@ -289,26 +282,29 @@ class MultiIDA:
         :return: generator of files processed (return code, file path)
         """
 
-        if MultiIDA._running:
-            raise MultiIDAAlreadyRunning()
-
-        MultiIDA._running = True
-
-        MultiIDA._script_file = script
-
-        MultiIDA._params = [] if params is None else params
-
-        MultiIDA._timeout = timeout
-
+        manager = Manager()
+        ingress = manager.Queue()
+        egress = manager.Queue()
         pool = Pool(workers)
-        task = pool.map_async(MultiIDA._worker_handle, generator, chunksize=1)
+
+        # Launch all workers
+        for i in range(workers):
+            pool.apply_async(MultiIDA._worker, (ingress, egress, script, params, timeout))
+
+        # Pre-fill ingress queue
+        total = 0
+        for file in generator:
+            ingress.put(file)
+            total += 1
+
+        i = 0
         while True:
-            try:
-                data = MultiIDA._data_queue.get(True)
-                if data:
-                    yield data
-            except queue.Empty:
-                pass
-            if task.ready():
+            path, res = egress.get()
+            i += 1
+            yield path, res
+
+            # once all items have been processed
+            if i == total:
                 break
-        MultiIDA._running = False
+
+        pool.terminate()
