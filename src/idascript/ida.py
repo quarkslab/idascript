@@ -6,7 +6,7 @@ from pathlib import Path
 from multiprocessing import Pool, Queue, Manager
 import queue
 import os
-from typing import List, Optional, Iterable, Union, Generator, Tuple
+from typing import List, Optional, Iterable, Union, Generator
 
 TIMEOUT_RETURNCODE: int = -1
 
