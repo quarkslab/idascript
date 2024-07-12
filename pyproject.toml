@@ -28,5 +28,5 @@ Repository = "https://github.com/quarkslab/idascript"
 Documentation = "https://quarkslab.github.io/diffing-portal/idascript/README.html"
 "Bug Tracker" = "https://github.com/quarkslab/idascript/issues"
 
-[tools.setuptools]
-script-files = ["bins/idascripter"]
+[project.scripts]
+idascripter = "idascript.__main__:main"

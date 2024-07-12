@@ -8,7 +8,7 @@ import collections
 import progressbar
 from typing import Optional, List, Dict
 
-import idascript
+from . import iter_binary_files, IDA, TIMEOUT_RETURNCODE, MultiIDA
 
 
 class FileMessage(progressbar.DynamicMessage):
@@ -56,9 +56,9 @@ def path_main(path: Path, script: Optional[str], params: List[str], worker: int,
     :return: None
     """
 
-    generator = idascript.iter_binary_files(path)
+    generator = iter_binary_files(path)
     print("Counting files to analyse..")
-    total = sum(1 for _ in idascript.iter_binary_files(path))
+    total = sum(1 for _ in iter_binary_files(path))
 
     bar = progressbar.ProgressBar(widgets=['[', FileMessage("binary"), ']',
                                            ' [', SuccessMessage("success"), '] ',
@@ -71,10 +71,10 @@ def path_main(path: Path, script: Optional[str], params: List[str], worker: int,
     results: Dict = {}
 
     i = 1
-    for retcode, file in idascript.MultiIDA.map(generator, script, params, worker, timeout):
+    for retcode, file in MultiIDA.map(generator, script, params, worker, timeout):
         if retcode == 0:
             counter['success'] += 1
-        elif retcode == idascript.TIMEOUT_RETURNCODE:
+        elif retcode == TIMEOUT_RETURNCODE:
             counter['timeout'] += 1
         else:
             counter['failure'] += 1
@@ -107,7 +107,7 @@ def file_main(file: Path, script: Optional[str], params: List[str], timeout: flo
     :return: None
     """
 
-    ida = idascript.IDA(file, script, params, timeout)
+    ida = IDA(file, script, params, timeout)
 
     ida.start()
     res = ida.wait()
