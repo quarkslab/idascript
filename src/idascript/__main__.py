@@ -8,7 +8,7 @@ import collections
 import progressbar
 from typing import Optional, List, Dict
 
-from . import iter_binary_files, IDA, TIMEOUT_RETURNCODE, MultiIDA
+from idascript import iter_binary_files, IDA, TIMEOUT_RETURNCODE, MultiIDA
 
 
 class FileMessage(progressbar.DynamicMessage):
