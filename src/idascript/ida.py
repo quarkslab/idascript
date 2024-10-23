@@ -74,11 +74,13 @@ class IDA:
                  binary_file: Union[Path, str],
                  script_file: Optional[Union[str, Path]] = None,
                  script_params: Optional[List[str]] = None,
-                 timeout: Optional[float] = None):
+                 timeout: Optional[float] = None,
+                 exit_virtualenv: bool = False):
         """
         :param binary_file: path of the binary file to analyse
         :param script_file: path to the Python script to execute on the binary (if required)
         :param script_params: additional parameters to send either to the script or IDA directly
+        :param exit_virtualenv: exit current virtual env before calling IDA
         """
 
         if not Path(binary_file).exists():
@@ -91,6 +93,7 @@ class IDA:
         self.params: List[str] = []  #: list of paramaters given to IDA
 
         self.timeout: Optional[float] = timeout  #: Timeout for IDA execution
+        self.exit_virtualenv: bool = exit_virtualenv
 
         if script_file is not None:  # Mode IDAPython
             self._set_idapython(script_file, script_params)
@@ -155,6 +158,11 @@ class IDA:
         env = os.environ
         env["TVHEADLESS"] = "1"
         env["TERM"] = "xterm"
+        if self.exit_virtualenv:
+            venv = env.pop("VIRTUAL_ENV", None)
+            if venv:
+                paths = env["PATH"].split(":")
+                env["PATH"] = ":".join(x for x in paths if venv not in x)
 
         self._process = subprocess.Popen(
             cmd_line,
@@ -247,12 +255,12 @@ class MultiIDA:
     """
 
     @staticmethod
-    def _worker(ingress, egress, script_file, params, timeout) -> None:
+    def _worker(ingress, egress, script_file, params, timeout, exit_virtualenv) -> None:
         while True:
             try:
                 file = ingress.get(timeout=0.5)
 
-                ida = IDA(file, script_file, params, timeout)
+                ida = IDA(file, script_file, params, timeout, exit_virtualenv)
                 ida.start()
                 res = ida.wait()
 
@@ -267,7 +275,8 @@ class MultiIDA:
             script: Union[str, Path] = None,
             params: List[str] = None,
             workers: int = None,
-            timeout: Optional[float] = None) -> Generator[tuple[int, Path], None, None]:
+            timeout: Optional[float] = None,
+            exit_virtualenv: bool = False) -> Generator[tuple[int, Path], None, None]:
         """
         Iterator the generator sent and apply the script file on each
         file concurrently on a bunch of IDA workers. The function consume
@@ -279,6 +288,7 @@ class MultiIDA:
         :param params: list of parameters to send to the script
         :param workers: number of workers to trigger in parallel
         :param timeout: timeout for IDA runs (-1 means infinity)
+        :param exit_virtualenv: exit current virtualenv before calling IDA
         :return: generator of files processed (return code, file path)
         """
 
@@ -289,7 +299,7 @@ class MultiIDA:
 
         # Launch all workers
         for i in range(workers):
-            pool.apply_async(MultiIDA._worker, (ingress, egress, script, params, timeout))
+            pool.apply_async(MultiIDA._worker, (ingress, egress, script, params, timeout, exit_virtualenv))
 
         # Pre-fill ingress queue
         total = 0
