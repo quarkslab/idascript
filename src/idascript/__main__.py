@@ -43,7 +43,7 @@ class SuccessMessage(progressbar.Variable):
 
 
 def path_main(path: Path, script: Optional[str], params: List[str], worker: int, timeout: float,
-              log: Optional[str] = None) -> None:
+              log: Optional[str] = None, exit_venv: bool = False) -> None:
     """
     Execute the IDA script on a bunch of binaries inside a directory
 
@@ -53,6 +53,7 @@ def path_main(path: Path, script: Optional[str], params: List[str], worker: int,
     :param worker: number of workers
     :param timeout: timeout
     :param log: log file path
+    :param exit_venv: run IDA outside of the venv
     :return: None
     """
 
@@ -71,7 +72,7 @@ def path_main(path: Path, script: Optional[str], params: List[str], worker: int,
     results: Dict = {}
 
     i = 1
-    for retcode, file in MultiIDA.map(generator, script, params, worker, timeout):
+    for retcode, file in MultiIDA.map(generator, script, params, worker, timeout, exit_venv):
         if retcode == 0:
             counter['success'] += 1
         elif retcode == TIMEOUT_RETURNCODE:
@@ -96,7 +97,7 @@ def path_main(path: Path, script: Optional[str], params: List[str], worker: int,
         print(f'\nLog file written in {log}')
 
 
-def file_main(file: Path, script: Optional[str], params: List[str], timeout: float) -> None:
+def file_main(file: Path, script: Optional[str], params: List[str], timeout: float, exit_venv: bool) -> None:
     """
     Execute the IDA script on a binary
 
@@ -104,10 +105,11 @@ def file_main(file: Path, script: Optional[str], params: List[str], timeout: flo
     :param script: IDA script to launch
     :param params: script parameters
     :param timeout: timeout
+    :param exit_venv: run IDA outside of the venv
     :return: None
     """
 
-    ida = IDA(file, script, params, timeout)
+    ida = IDA(file, script, params, timeout, exit_venv)
 
     ida.start()
     res = ida.wait()
@@ -122,9 +124,17 @@ def file_main(file: Path, script: Optional[str], params: List[str], timeout: flo
 @click.option('-t', '--timeout', type=click.FloatRange(-1, clamp=False), help="Timeout (-1 means no timeout)",
               default=None)
 @click.option('-l', '--log-file', type=click.Path(file_okay=True), default=None, help="Log file tow write results")
+@click.option("--exit-venv", is_flag=True, default=False, type=bool, help="Run IDA outside of current virtualenv")
 @click.argument("file", type=click.Path(exists=True), metavar="<file|path>")
 @click.argument('params', nargs=-1)
-def main(ida_path: str, worker: int, script: Optional[str], timeout: float, log_file: str, file: str, params) -> None:
+def main(ida_path: str,
+         worker: int,
+         script: Optional[str],
+         timeout: float,
+         log_file: str,
+         exit_venv: bool,
+         file: str,
+         params) -> None:
     """
 
     <file/path>  Binary file to analyse (or directory)\r\n
@@ -136,9 +146,9 @@ def main(ida_path: str, worker: int, script: Optional[str], timeout: float, log_
     p = Path(file)
 
     if p.is_file():
-        file_main(p, script, list(params), timeout)
+        file_main(p, script, list(params), timeout, exit_venv)
     elif p.is_dir():
-        path_main(p, script, list(params), worker, timeout, log_file)
+        path_main(p, script, list(params), worker, timeout, log_file, exit_venv)
     else:
         raise FileExistsError("Invalid file type")
 

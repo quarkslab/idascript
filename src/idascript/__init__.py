@@ -26,6 +26,7 @@ def __check_path() -> bool:
                 return True
     return False
 
+
 if not __check_environ():
     if not __check_path():
         logging.warning("IDA Pro executable not found, should be in $PATH or IDA_PATH env variable")
