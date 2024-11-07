@@ -8,7 +8,6 @@ BIN_NAME = "idat64.exe" if sys.platform == "win32" else "idat64"
 
 IDA_BINARY = None
 
-
 def __check_environ() -> bool:
     global IDA_BINARY
     if IDA_PATH_ENV in os.environ:
@@ -30,6 +29,14 @@ def __check_path() -> bool:
 if not __check_environ():
     if not __check_path():
         logging.warning("IDA Pro executable not found, should be in $PATH or IDA_PATH env variable")
+
+
+def is_headless() -> bool:
+    import psutil
+    current_process = psutil.Process()
+    process_name = current_process.name()
+    return process_name.startswith("idat")
+
 
 from idascript.ida import IDA, MultiIDA, TIMEOUT_RETURNCODE
 from idascript.utils import iter_binary_files
