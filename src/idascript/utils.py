@@ -24,12 +24,12 @@ def iter_binary_files(path: Union[str, Path]) -> Generator[Path, None, None]:
     """
 
     p = Path(path)
-    if p.is_file():
+    if p.is_file() and not p.is_symlink():
         mime_type = magic.from_file(str(p), mime=True)
         if mime_type in BINARY_FORMAT:
             yield p
         elif p.suffix in EXTENSIONS_WHITELIST.get(mime_type, []):
             yield p
-    elif p.is_dir():
+    elif p.is_dir() and not p.is_symlink():
         for child in p.iterdir():
             yield from iter_binary_files(child)
