@@ -311,7 +311,7 @@ class MultiIDA:
         while True:
             path, res = egress.get()
             i += 1
-            yield path, res
+            yield res, path
 
             # once all items have been processed
             if i == total:
