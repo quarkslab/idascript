@@ -18,7 +18,7 @@ jobs:
         run: pip install wheel
       - name: Build wheel
         run: pip wheel -w wheels .
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: artifact
           path: ./wheels/idascript*.whl
@@ -34,7 +34,7 @@ jobs:
         run: |
           python -m pip install -U pip build
           python -m build --sdist
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: artifact
           path: dist/*.tar.gz
