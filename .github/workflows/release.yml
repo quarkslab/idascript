@@ -44,6 +44,10 @@ jobs:
         with:
           password: ${{ secrets.PYPI_DEPLOY_TOKEN }}
 
+  upload_artifacts_release:
+    needs: build_wheel_and_sdist
+    runs-on: ubuntu-latest
+    steps:
       - name: Upload Python packages for release notes
         uses: softprops/action-gh-release@v0.1.15
         with:
