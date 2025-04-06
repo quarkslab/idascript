@@ -307,6 +307,11 @@ class MultiIDA:
             ingress.put(file)
             total += 1
 
+        if not total:
+            logging.warning("no file provided found in the iterator")
+            pool.terminate()
+            return
+
         i = 0
         while True:
             path, res = egress.get()
