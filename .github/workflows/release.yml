@@ -19,9 +19,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: pip install build
+        run: pip install --upgrade build
       - name: Build wheel and sdist
         run: python -m build
+      - name: Validate Build Artifacts
+        run: tar -tzf dist/idascript-*.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: artifact_${{ matrix.python-version }}
@@ -32,6 +34,11 @@ jobs:
   upload_pypi:
     needs: build_wheel_and_sdist
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/idascript
+    permissions:
+      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -42,7 +49,10 @@ jobs:
       - name: Publish a Python distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_DEPLOY_TOKEN }}
+          packages-dir: ./dist/
+          attestations: true
+        # with:
+        #  password: ${{ secrets.PYPI_DEPLOY_TOKEN }}
 
   upload_artifacts_release:
     needs: build_wheel_and_sdist
