@@ -1,19 +1,65 @@
 import enum
 import subprocess
 import logging
-from idascript import IDA_BINARY
+import sys
 from pathlib import Path
 from multiprocessing import Pool, Queue, Manager
 import queue
 import os
+import shutil
 from typing import List, Optional, Iterable, Union, Generator
+
+OptPath = Optional[Path]
+OptPathLike = Optional[Union[Path, str]]
+
 
 TIMEOUT_RETURNCODE: int = -1
 
 
+IDA_PATH_ENV = "IDA_PATH"
+
+
+def __get_names() -> list[str]:
+    names = ["idat64", "idat"]
+    if sys.platform == "win32":
+        return [x+".exe" for x in names]
+    else:
+        return names
+
+
+def get_ida_path() -> Path | None:
+    """
+    Get the path to the IDA Pro executable.
+    If IDA_PATH environment variable is set, it will use that.
+    Otherwise, it will search in the PATH environment variable.
+    If not found, it will raise an exception.
+
+    :return: Path to the IDA Pro executable or None if not found
+    """
+    # First search in ENV variables
+    if ida_path := os.environ.get(IDA_PATH_ENV):
+        # Return the path as-is
+        ida_path = Path(ida_path)
+        if ida_path.exists():
+            logging.debug(f"Use IDA Pro: {ida_path}")
+            return ida_path.resolve()
+        else:
+            logging.warning(f"IDA_PATH environment variable set to {ida_path}, but it does not exist.")
+
+    # Search for it in the PATH
+    for bin_name in __get_names():
+        if ida_path := shutil.which(bin_name):
+            ida_path = Path(ida_path)
+            logging.debug(f"Use IDA Pro found in PATH: {ida_path}")
+            return ida_path.resolve()
+
+    logging.warning("IDA Pro executable not found in $PATH or IDA_PATH env variable")
+    return None
+
+
 class IDAException(Exception):
     """
-    Base class for exceptions in the module.
+    Base class for exceptions in the moduIDAExceptionle.
     """
 
     pass
@@ -57,9 +103,11 @@ class IDAMode(enum.Enum):
     NOTSET = enum.auto()
 
     # Used when IDA will be launched for an IDAPython script
+    # It will preprend -S[script.py] on the command line
     IDAPYTHON = enum.auto()
 
-    # Used when IDA will be launched directly
+    # Used when IDA will be launched directly with options
+    # It will preprend -O[option] to every options provided
     DIRECT = enum.auto()
 
 
@@ -72,7 +120,7 @@ class IDA:
 
     def __init__(self,
                  binary_file: Union[Path, str],
-                 script_file: Optional[Union[str, Path]] = None,
+                 script_file: OptPathLike = None,
                  script_params: Optional[List[str]] = None,
                  timeout: Optional[float] = None,
                  exit_virtualenv: bool = False):
@@ -84,12 +132,12 @@ class IDA:
         """
 
         if not Path(binary_file).exists():
-            raise FileNotFoundError("Binary file: %s" % binary_file)
+            raise FileNotFoundError(f"Binary file: {binary_file}")
 
         self.bin_file: Path = Path(binary_file).resolve()  #: File to the binary
         self._process = None
 
-        self.script_file: Optional[Path] = None  #: script file to execute
+        self.script_file: OptPath = None  #: script file to execute
         self.params: List[str] = []  #: list of paramaters given to IDA
 
         self.timeout: Optional[float] = timeout  #: Timeout for IDA execution
@@ -100,40 +148,42 @@ class IDA:
         else:  # Direct mode
             self._set_direct(script_params)
 
-    def _set_idapython(self, script_file: Union[Path, str], script_params: List[str] = None) -> None:
+    def _set_idapython(self, script_file: OptPathLike, script_params: List[str]|None = None) -> None:
         """
         Set IDAPython script parameter.
 
         :param script_file: path to the script to execute on the binary file
         :param script_params: additional parameters sent to the script (available via idc.ARGV in idapython)
         """
+        # Configure script file
+        if script_file is None:
+            raise FileNotFoundError("In IDAPython mode, script_file must be set")
+        else:
+            self.script_file = Path(script_file).resolve()
+            if not Path(script_file).exists():
+                raise FileNotFoundError(f"Script file: {script_file}")
 
-        if not Path(script_file).exists():
-            raise FileNotFoundError("Script file: %s" % script_file)
-
+        # Configure script parameters
         if script_params is None:
             script_params = []
-
-        if script_params:
-            if not isinstance(script_params, list):
-                raise TypeError("script_params parameter should be a list")
-
-        self.script_file = Path(script_file).resolve()
         self.params = [x.replace('"', '\\"') for x in script_params] if script_params else []
+
         self.mode = IDAMode.IDAPYTHON
 
-    def _set_direct(self, script_options: List[str]) -> None:
+    def _set_direct(self, script_options: List[str]|None) -> None:
         """
         Set parameters script in direct mode
 
         :param script_options: List of script options
         :return: None
         """
-
-        for option in script_options:
-            if ':' not in option:
-                raise TypeError('Options must have a ":"')
-            self.params.append(f'-O{option}')
+        if script_options:
+            for option in script_options:
+                if ':' not in option:
+                    raise TypeError('Options must have a ":"')
+                self.params.append(f'-O{option}')
+        else:
+            logging.warning(f"Direct mode used without any options.")
 
         self.mode = IDAMode.DIRECT
 
@@ -141,10 +191,15 @@ class IDA:
         """
         Start the IDA process on the binary.
         """
+        ida_path = get_ida_path()
+        if ida_path is None:
+            raise IDAException("IDA Pro executable not found. Please set the IDA_PATH "
+                               "environment variable or ensure it is in your PATH.")
 
-        cmd_line = [IDA_BINARY.as_posix(), '-A']
+        cmd_line = [ida_path.as_posix(), '-A']
 
         if self.mode == IDAMode.IDAPYTHON:
+            assert self.script_file is not None, "Script file must be set for IDAPython mode"
             params = " "+" ".join(self.params) if self.params else ""
             cmd_line.append('-S%s%s' % (self.script_file.as_posix(), params))
         elif self.mode == IDAMode.DIRECT:
@@ -255,7 +310,8 @@ class MultiIDA:
     """
 
     @staticmethod
-    def _worker(ingress, egress, script_file, params, timeout, exit_virtualenv) -> None:
+    def _worker(ingress: Queue, egress: Queue, script_file: OptPathLike,
+                params: list[str]|None, timeout: float, exit_virtualenv: bool) -> None:
         while True:
             try:
                 file = ingress.get(timeout=0.5)
@@ -272,9 +328,9 @@ class MultiIDA:
 
     @staticmethod
     def map(generator: Iterable[Path],
-            script: Union[str, Path] = None,
-            params: List[str] = None,
-            workers: int = None,
+            script: OptPathLike = None,
+            params: List[str]|None = None,
+            workers: int = 4,
             timeout: Optional[float] = None,
             exit_virtualenv: bool = False) -> Generator[tuple[int, Path], None, None]:
         """

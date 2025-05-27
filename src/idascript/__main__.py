@@ -9,7 +9,8 @@ import collections
 import progressbar
 from typing import Optional, List, Dict
 
-from idascript import iter_binary_files, IDA, TIMEOUT_RETURNCODE, MultiIDA
+from idascript import iter_binary_files, IDA, TIMEOUT_RETURNCODE, \
+                      MultiIDA, IDA_PATH_ENV, NOP_SCRIPT, get_ida_path
 
 
 class FileMessage(progressbar.DynamicMessage):
@@ -43,7 +44,7 @@ class SuccessMessage(progressbar.Variable):
             return 'OK:- KO:- TO:-'
 
 
-def path_main(path: Path, script: Optional[str], params: List[str], worker: int, timeout: float,
+def path_main(path: Path, script: Optional[str|Path], params: List[str], worker: int, timeout: float,
               log: Optional[str] = None, exit_venv: bool = False) -> None:
     """
     Execute the IDA script on a bunch of binaries inside a directory
@@ -98,7 +99,7 @@ def path_main(path: Path, script: Optional[str], params: List[str], worker: int,
         logging.info(f"\nLog file written in {log}")
 
 
-def file_main(file: Path, script: Optional[str], params: List[str], timeout: float, exit_venv: bool) -> None:
+def file_main(file: Path, script: Optional[str|Path], params: List[str], timeout: float, exit_venv: bool) -> None:
     """
     Execute the IDA script on a binary
 
@@ -121,7 +122,7 @@ def file_main(file: Path, script: Optional[str], params: List[str], timeout: flo
 @click.option('-i', '--ida-path',
               type=click.Path(exists=True),
               default=None,
-              help="IDA Pro installation directory")
+              help="IDA Pro executable path")
 @click.option('-w', '--worker',
               type=click.IntRange(1, multiprocessing.cpu_count(), clamp=True),
               default=1,
@@ -155,7 +156,7 @@ def file_main(file: Path, script: Optional[str], params: List[str], timeout: flo
                 nargs=-1)
 def main(ida_path: str,
          worker: int,
-         script: Optional[str],
+         script: Optional[str|Path],
          timeout: float,
          log_file: str,
          exit_venv: bool,
@@ -172,19 +173,28 @@ def main(ida_path: str,
     logging.basicConfig(format="%(message)s", level=logging.DEBUG if verbose else logging.INFO)
 
     if ida_path:
-        os.environ['IDA_PATH'] = str(Path(ida_path).absolute())
+        os.environ[IDA_PATH_ENV] = str(Path(ida_path).absolute())
     p = Path(file)
+
+    ida_path = get_ida_path()
+    if not ida_path:
+        click.echo("IDA Pro executable not found, please set the IDA_PATH environment variable or use the -i option", err=True)
+        sys.exit(1)
+    if not ida_path.is_file():
+        click.echo(f"IDA Pro path should be the executable, not the directory", err=True)
+        sys.exit(1)
 
     if not script:
         logging.info("No script provided, just perform disassembly")
-        script = Path(__file__).parent / "nop_script.py"
-        script = script.absolute()
+        script_to_launch: Path  = NOP_SCRIPT
         # Retrieve the nop_script to just generate IDA DB
+    else:
+        script_to_launch = Path(script).absolute()
 
     if p.is_file():
-        file_main(p, script, list(params), timeout, exit_venv)
+        file_main(p, script_to_launch, list(params), timeout, exit_venv)
     elif p.is_dir():
-        path_main(p, script, list(params), worker, timeout, log_file, exit_venv)
+        path_main(p, script_to_launch, list(params), worker, timeout, log_file, exit_venv)
     else:
         raise FileExistsError("Invalid file type")
 
