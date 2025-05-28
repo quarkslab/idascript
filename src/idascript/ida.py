@@ -7,7 +7,10 @@ from multiprocessing import Pool, Queue, Manager
 import queue
 import os
 import shutil
-from typing import List, Optional, Iterable, Union, Generator
+from typing import List, Optional, Iterable, Union, Generator, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import io
 
 OptPath = Optional[Path]
 OptPathLike = Optional[Union[Path, str]]
@@ -234,8 +237,8 @@ class IDA:
 
         self._process = subprocess.Popen(
             cmd_line,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             # See `https://www.hex-rays.com/blog/igor-tip-of-the-week-08-batch-mode-under-the-hood/`_
             env=env
         )
@@ -312,6 +315,28 @@ class IDA:
 
         if self._process:
             self._process.kill()
+        else:
+            raise IDANotStared()
+
+    @property
+    def stdout(self) -> io.BufferedReader:
+        """
+        The underlying stdout
+        """
+
+        if self._process:
+            return self._process.stdout
+        else:
+            raise IDANotStared()
+
+    @property
+    def stderr(self) -> io.BufferedReader:
+        """
+        The underlying stderr
+        """
+
+        if self._process:
+            return self._process.stderr
         else:
             raise IDANotStared()
 
