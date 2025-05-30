@@ -1,10 +1,8 @@
 from pathlib import Path
 
-from idascript.ida import IDA, MultiIDA, TIMEOUT_RETURNCODE, IDA_PATH_ENV, get_ida_path
+from idascript.ida import IDA, MultiIDA, TIMEOUT_RETURNCODE, IDA_PATH_ENV, get_ida_path, NOP_SCRIPT
 from idascript.utils import iter_binary_files
 
-
-NOP_SCRIPT = (Path(__file__).parent / "nop_script.py").absolute()
 
 
 def is_headless() -> bool:

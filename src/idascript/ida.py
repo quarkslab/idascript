@@ -7,7 +7,10 @@ from multiprocessing import Pool, Queue, Manager
 import queue
 import os
 import shutil
-from typing import List, Optional, Iterable, Union, Generator
+from typing import List, Optional, Iterable, Union, Generator, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import io
 
 OptPath = Optional[Path]
 OptPathLike = Optional[Union[Path, str]]
@@ -17,6 +20,8 @@ TIMEOUT_RETURNCODE: int = -1
 
 
 IDA_PATH_ENV = "IDA_PATH"
+
+NOP_SCRIPT = (Path(__file__).parent / 'nop_script.py').absolute()
 
 
 def __get_names() -> list[str]:
@@ -40,11 +45,14 @@ def get_ida_path() -> Path | None:
     if ida_path := os.environ.get(IDA_PATH_ENV):
         # Return the path as-is
         ida_path = Path(ida_path)
-        if ida_path.exists():
+        
+        if not ida_path.exists():
+            logging.warning(f"IDA_PATH environment variable set to {ida_path}, but it does not exist.")
+        elif not ida_path.is_file():
+            logging.warning(f"IDA_PATH environment variable set to {ida_path} is not a file. It should point to the idat binary file.")
+        else:
             logging.debug(f"Use IDA Pro: {ida_path}")
             return ida_path.resolve()
-        else:
-            logging.warning(f"IDA_PATH environment variable set to {ida_path}, but it does not exist.")
 
     # Search for it in the PATH
     for bin_name in __get_names():
@@ -120,15 +128,19 @@ class IDA:
 
     def __init__(self,
                  binary_file: Union[Path, str],
-                 script_file: OptPathLike = None,
+                 script_file: OptPathLike = NOP_SCRIPT,
                  script_params: Optional[List[str]] = None,
                  timeout: Optional[float] = None,
-                 exit_virtualenv: bool = False):
+                 exit_virtualenv: bool = False,
+                 database_path: Optional[Union[Path, str]] = None):
         """
         :param binary_file: path of the binary file to analyse
-        :param script_file: path to the Python script to execute on the binary (if required)
+        :param script_file: path to the Python script to execute on the binary (if required).
+                            By default the NOP_SCRIPT is used, that will quit after terminating the analysis.
+                            If you want to avoid using a script at all, set this parameter to None.
         :param script_params: additional parameters to send either to the script or IDA directly
         :param exit_virtualenv: exit current virtual env before calling IDA
+        :param database_path: specify the output database (implies deleting the old pre-existing database, if any)
         """
 
         if not Path(binary_file).exists():
@@ -142,6 +154,7 @@ class IDA:
 
         self.timeout: Optional[float] = timeout  #: Timeout for IDA execution
         self.exit_virtualenv: bool = exit_virtualenv
+        self._database_path: Optional[Path] = Path(database_path) if database_path else None
 
         if script_file is not None:  # Mode IDAPython
             self._set_idapython(script_file, script_params)
@@ -198,6 +211,9 @@ class IDA:
 
         cmd_line = [ida_path.as_posix(), '-A']
 
+        if self._database_path:
+            cmd_line.append(f"-o{self._database_path.as_posix()}")
+
         if self.mode == IDAMode.IDAPYTHON:
             assert self.script_file is not None, "Script file must be set for IDAPython mode"
             params = " "+" ".join(self.params) if self.params else ""
@@ -221,8 +237,8 @@ class IDA:
 
         self._process = subprocess.Popen(
             cmd_line,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             # See `https://www.hex-rays.com/blog/igor-tip-of-the-week-08-batch-mode-under-the-hood/`_
             env=env
         )
@@ -299,6 +315,28 @@ class IDA:
 
         if self._process:
             self._process.kill()
+        else:
+            raise IDANotStared()
+
+    @property
+    def stdout(self) -> io.BufferedReader:
+        """
+        The underlying stdout
+        """
+
+        if self._process:
+            return self._process.stdout
+        else:
+            raise IDANotStared()
+
+    @property
+    def stderr(self) -> io.BufferedReader:
+        """
+        The underlying stderr
+        """
+
+        if self._process:
+            return self._process.stderr
         else:
             raise IDANotStared()
 
