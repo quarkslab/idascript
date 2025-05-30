@@ -9,8 +9,7 @@ import os
 import shutil
 from typing import List, Optional, Iterable, Union, Generator, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import io
+import io
 
 OptPath = Optional[Path]
 OptPathLike = Optional[Union[Path, str]]
