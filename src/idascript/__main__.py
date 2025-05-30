@@ -120,7 +120,7 @@ def file_main(file: Path, script: Optional[str|Path], params: List[str], timeout
 
 @click.command()
 @click.option('-i', '--ida-path',
-              type=click.Path(exists=True),
+              type=click.Path(exists=True, path_type=Path),
               default=None,
               help="IDA Pro executable path")
 @click.option('-w', '--worker',
@@ -128,7 +128,7 @@ def file_main(file: Path, script: Optional[str|Path], params: List[str], timeout
               default=1,
               help="Number of parallel workers (thread)")
 @click.option('-s', '--script',
-              type=click.Path(exists=True),
+              type=click.Path(exists=True, path_type=Path),
               metavar="<ida script>",
               help="IDAPython script")
 @click.option('-t', '--timeout',
@@ -150,18 +150,18 @@ def file_main(file: Path, script: Optional[str|Path], params: List[str], timeout
               type=bool,
               help="Enable debug logs")
 @click.argument("file",
-                type=click.Path(exists=True),
+                type=click.Path(exists=True, path_type=Path),
                 metavar="<file|path>")
 @click.argument('params',
                 nargs=-1)
-def main(ida_path: str,
+def main(ida_path: Path,
          worker: int,
-         script: Optional[str|Path],
+         script: Optional[Path],
          timeout: float,
          log_file: str,
          exit_venv: bool,
          verbose: bool,
-         file: str,
+         file: Path,
          params) -> None:
     """
 
