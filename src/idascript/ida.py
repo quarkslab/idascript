@@ -15,9 +15,6 @@ OptPath = Optional[Path]
 OptPathLike = Optional[Union[Path, str]]
 
 
-TIMEOUT_RETURNCODE: int = -1
-
-
 IDA_PATH_ENV = "IDA_PATH"
 
 NOP_SCRIPT = (Path(__file__).parent / 'nop_script.py').absolute()
@@ -124,6 +121,8 @@ class IDA:
     with a given script. This class is a wrapper to
     subprocess IDA.
     """
+
+    TIMEOUT_RETURNCODE: int = 0x1001 # arbitrary value
 
     def __init__(self,
                  binary_file: Union[Path, str],
@@ -293,7 +292,7 @@ class IDA:
                 return self._process.wait(self.timeout)
             except subprocess.TimeoutExpired:
                 self._process.terminate()
-                return TIMEOUT_RETURNCODE
+                return self.TIMEOUT_RETURNCODE
         else:
             raise IDANotStared()
 
