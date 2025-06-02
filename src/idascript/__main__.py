@@ -9,7 +9,7 @@ import collections
 import progressbar
 from typing import Optional, List, Dict
 
-from idascript import iter_binary_files, IDA, TIMEOUT_RETURNCODE, \
+from idascript import iter_binary_files, IDA, \
                       MultiIDA, IDA_PATH_ENV, NOP_SCRIPT, get_ida_path
 
 
@@ -77,7 +77,7 @@ def path_main(path: Path, script: Optional[str|Path], params: List[str], worker:
     for retcode, file in MultiIDA.map(generator, script, params, worker, timeout, exit_venv):
         if retcode == 0:
             counter['success'] += 1
-        elif retcode == TIMEOUT_RETURNCODE:
+        elif retcode == IDA.TIMEOUT_RETURNCODE:
             counter['timeout'] += 1
         else:
             counter['failure'] += 1

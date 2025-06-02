@@ -150,7 +150,10 @@ class IDA:
         self.script_file: OptPath = None  #: script file to execute
         self.params: List[str] = []  #: list of paramaters given to IDA
 
-        self.timeout: Optional[float] = timeout  #: Timeout for IDA execution
+        self.timeout: Optional[float] = None
+        if timeout is not None:
+            if timeout > 0:
+                self.timeout = timeout
         self.exit_virtualenv: bool = exit_virtualenv
         self._database_path: Optional[Path] = Path(database_path) if database_path else None
 
