@@ -32,8 +32,9 @@ def get_ida_path() -> Path | None:
     """
     Get the path to the IDA Pro executable.
     If IDA_PATH environment variable is set, it will use that.
+    It can be either the path to the executable or the directory containing it.
     Otherwise, it will search in the PATH environment variable.
-    If not found, it will raise an exception.
+    If not found, it will return None.
 
     :return: Path to the IDA Pro executable or None if not found
     """
@@ -44,18 +45,25 @@ def get_ida_path() -> Path | None:
         
         if not ida_path.exists():
             logging.warning(f"IDA_PATH environment variable set to {ida_path}, but it does not exist.")
-        elif not ida_path.is_file():
-            logging.warning(f"IDA_PATH environment variable set to {ida_path} is not a file. It should point to the idat binary file.")
+            return None
+        elif ida_path.is_file() or ida_path.is_symlink():
+            return ida_path.resolve()
+        elif ida_path.is_dir():
+            # Check for the binary in the directory
+            for bin_name in __get_names():
+                candidate = ida_path / bin_name
+                if candidate.exists() and candidate.is_file():
+                    logging.debug(f"Use IDA Pro from IDA_PATH env variable: {candidate}")
+                    return candidate.resolve()
+            # if not found fallback to None
         else:
-            logging.debug(f"Use IDA Pro: {ida_path}")
-            return ida_path.resolve()
-
-    # Search for it in the PATH
-    for bin_name in __get_names():
-        if ida_path := shutil.which(bin_name):
-            ida_path = Path(ida_path)
-            logging.debug(f"Use IDA Pro found in PATH: {ida_path}")
-            return ida_path.resolve()
+            assert False, "Invalid file type for IDA_PATH env variable"
+    else:
+        for bin_name in __get_names():
+            if ida_path := shutil.which(bin_name):  # Search for it in the $PATH
+                ida_path = Path(ida_path)
+                logging.debug(f"Use IDA Pro found in PATH: {ida_path}")
+                return ida_path.resolve()
 
     logging.warning("IDA Pro executable not found in $PATH or IDA_PATH env variable")
     return None
@@ -63,7 +71,7 @@ def get_ida_path() -> Path | None:
 
 class IDAException(Exception):
     """
-    Base class for exceptions in the moduIDAExceptionle.
+    Base class for exceptions in the IDA module.
     """
 
     pass
