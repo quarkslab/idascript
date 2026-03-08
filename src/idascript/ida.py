@@ -164,6 +164,8 @@ class IDA:
                 self.timeout = timeout
         self.exit_virtualenv: bool = exit_virtualenv
         self._database_path: Optional[Path] = Path(database_path) if database_path else None
+        self._stdout_buf: Optional[io.BytesIO] = None
+        self._stderr_buf: Optional[io.BytesIO] = None
 
         if script_file is not None:  # Mode IDAPython
             self._set_idapython(script_file, script_params)
@@ -293,17 +295,26 @@ class IDA:
 
     def wait(self) -> int:
         """
-        Wait for the process to finish. This function hangs until
-        the process terminate. A timeout can be given which raises
-        TimeoutExpired if the timeout is exceeded (subprocess mechanism).
+        Wait for the process to finish and capture its output.
+        Uses communicate() internally to drain stdout/stderr pipes,
+        avoiding deadlocks when pipe buffers fill up.
+        A timeout can be given which terminates the process if exceeded.
+        After this call, stdout and stderr are available as BytesIO objects
+        via the .stdout and .stderr properties.
         """
 
         if self._process:
             try:
-                return self._process.wait(self.timeout)
+                stdout_data, stderr_data = self._process.communicate(timeout=self.timeout)
             except subprocess.TimeoutExpired:
                 self._process.terminate()
+                stdout_data, stderr_data = self._process.communicate()
+                self._stdout_buf = io.BytesIO(stdout_data or b"")
+                self._stderr_buf = io.BytesIO(stderr_data or b"")
                 return self.TIMEOUT_RETURNCODE
+            self._stdout_buf = io.BytesIO(stdout_data or b"")
+            self._stderr_buf = io.BytesIO(stderr_data or b"")
+            return self._process.returncode
         else:
             raise IDANotStared()
 
@@ -328,23 +339,29 @@ class IDA:
             raise IDANotStared()
 
     @property
-    def stdout(self) -> io.BufferedReader:
+    def stdout(self) -> io.BufferedIOBase:
         """
-        The underlying stdout
+        Process stdout. Before wait(), returns the raw pipe.
+        After wait(), returns a BytesIO of the captured output.
         """
 
         if self._process:
+            if self._stdout_buf is not None:
+                return self._stdout_buf
             return self._process.stdout
         else:
             raise IDANotStared()
 
     @property
-    def stderr(self) -> io.BufferedReader:
+    def stderr(self) -> io.BufferedIOBase:
         """
-        The underlying stderr
+        Process stderr. Before wait(), returns the raw pipe.
+        After wait(), returns a BytesIO of the captured output.
         """
 
         if self._process:
+            if self._stderr_buf is not None:
+                return self._stderr_buf
             return self._process.stderr
         else:
             raise IDANotStared()
