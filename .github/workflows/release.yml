@@ -24,7 +24,7 @@ jobs:
         run: python -m build
       - name: Validate Build Artifacts
         run: tar -tzf dist/idascript-*.tar.gz
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: artifact_${{ matrix.python-version }}
           path: |
@@ -40,7 +40,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           pattern: artifact_*
           merge-multiple: true
